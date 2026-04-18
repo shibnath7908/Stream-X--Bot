@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StreamX - Pro Admin Panel</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root { --primary: #ff003c; --bg: #0d0d12; --card: #181820; --input-bg: #22222a; --text: #ffffff; --text-muted: #a0a0b0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 50px; }
+        
+        header { background: var(--card); padding: 20px; text-align: center; border-bottom: 2px solid var(--primary); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        header h2 { font-size: 22px; color: var(--primary); display: flex; align-items: center; justify-content: center; gap: 10px; }
+
+        .container { max-width: 800px; margin: 20px auto; padding: 0 15px; display: flex; flex-direction: column; gap: 25px; }
+        .card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); border: 1px solid #2a2a35; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a2a35; padding-bottom: 15px; margin-bottom: 20px; }
+        .card-header .title-group { display: flex; align-items: center; gap: 12px; }
+        .card-header i { font-size: 24px; color: var(--primary); background: rgba(255,0,60,0.1); padding: 10px; border-radius: 10px; }
+        
+        .live-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 0; }
+        .live-box span { font-size: 36px; font-weight: bold; color: #00e676; text-shadow: 0 0 10px rgba(0,230,118,0.4); margin-top: 5px; }
+
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 14px; color: var(--text-muted); margin-bottom: 8px; font-weight: bold; }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        .input-wrapper i { position: absolute; left: 15px; color: var(--text-muted); font-size: 16px; z-index: 10; }
+        .input-wrapper input, .input-wrapper select { width: 100%; padding: 14px 14px 14px 45px; background: var(--input-bg); border: 1px solid #333; color: white; border-radius: 12px; font-size: 15px; outline: none; transition: 0.3s; }
+        .input-wrapper input:focus, .input-wrapper select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,0,60,0.2); }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        @media(max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.3s; color: white; }
+        .btn-primary { background: var(--primary); } .btn-primary:hover { background: #d60032; }
+        .btn-success { background: #00c853; } .btn-success:hover { background: #009624; }
+        .btn-info { background: #007bff; } .btn-danger { background: #ff1744; }
+        .btn-warning { background: #f39c12; }
+
+        .cat-item { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 10px 15px; margin-bottom: 10px; border-radius: 8px; border-left: 3px solid #007bff; }
+        .cat-item button { background: #ff1744; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; }
+
+        .video-item { background: var(--input-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--primary); display: flex; flex-direction: column; gap: 15px; }
+        .v-title { font-size: 16px; font-weight: bold; }
+        .v-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+        .badge { background: #111; padding: 5px 10px; border-radius: 8px; font-size: 12px; color: #ccc; border: 1px solid #333; }
+        .v-actions { display: flex; flex-wrap: wrap; gap: 10px; } .v-actions .btn { padding: 10px; font-size: 13px; flex: 1; min-width: 100px; }
+
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-content { background: var(--card); width: 100%; max-width: 600px; border-radius: 16px; padding: 25px; border: 1px solid var(--primary); position: relative; max-height: 90vh; overflow-y: auto; }
+        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 24px; color: var(--text-muted); cursor: pointer; }
+        
+        .adm-comment { background: #111; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 3px solid #00c853; }
+        .adm-comment strong { color: var(--primary); display: block; margin-bottom: 5px; }
+        .adm-comment p { margin: 8px 0; font-size: 14px; }
+        .adm-comment-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .adm-comment-actions button { background: #222; border: 1px solid #444; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .admin-reply-box { margin-top: 10px; background: rgba(0,200,83,0.1); padding: 10px; border-radius: 5px; border-left: 3px solid #00c853; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2><i class="fa-solid fa-video"></i> STREAMX ADMIN</h2>
+</header>
+
+<div class="container">
+    <div class="card live-box">
+        <p style="color: var(--text-muted); font-size: 14px;"><i class="fa-solid fa-circle-dot" style="color: #00e676;"></i> রিয়েল-টাইম লাইভ ইউজার</p>
+        <span id="live-count">0</span>
+    </div>
+
+    <!-- Website & General Ad Settings -->
+    <div class="card">
+        <div class="card-header"><div class="title-group"><i class="fa-solid fa-gears"></i><h3>ওয়েবসাইট ও অ্যাড সেটিংস</h3></div></div>
+        <div class="grid-2">
+            <div class="input-group"><label>ওয়েবসাইটের নাম</label><div class="input-wrapper"><i class="fa-solid fa-globe"></i><input type="text" id="set-site-name" placeholder="STREAMX 🎥"></div></div>
+            <div class="input-group"><label>টেলিগ্রাম মিনি অ্যাপ লিংক</label><div class="input-wrapper"><i class="fa-brands fa-telegram"></i><input type="text" id="set-tg-app-url" placeholder="https://t.me/Bot/App"></div></div>
+        </div>
+        
+        <h4 style="margin:15px 0 10px; border-bottom:1px solid #333; padding-bottom:5px; color:#ff003c;">ভিডিও মিড-রোল অ্যাড (ভিডিও দেখার সময়)</h4>
+        <div class="grid-2">
+            <div class="input-group"><label>অ্যাড টাইম (কমা দিয়ে সেকেন্ড লিখুন)</label><div class="input-wrapper"><i class="fa-solid fa-stopwatch"></i><input type="text" id="set-ad-interval" placeholder="যেমন: 10, 45, 120"></div></div>
+            <div class="input-group"><label>ভিডিও Adsgram Block ID</label><div class="input-wrapper"><i class="fa-solid fa-ad"></i><input type="text" id="set-adsgram-id" placeholder="Adsgram ID"></div></div>
+        </div>
+        <div class="input-group"><label>Monetag (libtl) Zone ID</label><div class="input-wrapper"><i class="fa-solid fa-bullhorn"></i><input type="text" id="set-monetag-zone" placeholder="Zone ID (e.g. 9326895)"></div></div>
+
+        <h4 style="margin:15px 0 10px; border-bottom:1px solid #333; padding-bottom:5px; color:#00e676;">আইডল অ্যাড (ভিডিও না দেখলে বা অপেক্ষা করলে)</h4>
+        <div class="grid-2">
+            <div class="input-group"><label>আইডল অ্যাড টাইম (সেকেন্ড)</label><div class="input-wrapper"><i class="fa-regular fa-clock"></i><input type="number" id="set-idle-time" placeholder="যেমন: 30"></div></div>
+            <div class="input-group"><label>আইডল Adsgram Block ID</label><div class="input-wrapper"><i class="fa-solid fa-rectangle-ad"></i><input type="text" id="set-idle-adsgram-id" placeholder="Idle Adsgram ID"></div></div>
+        </div>
+
+        <button class="btn btn-success" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> সেটিংস সেভ করুন</button>
+    </div>
+
+    <!-- Category Management -->
+    <div class="card">
+        <div class="card-header"><div class="title-group"><i class="fa-solid fa-layer-group"></i><h3>ক্যাটাগরি ম্যানেজমেন্ট</h3></div></div>
+        <div class="input-group">
+            <label>নতুন ক্যাটাগরি তৈরি করুন</label>
+            <div style="display:flex; gap:10px;">
+                <div class="input-wrapper" style="flex:1;"><i class="fa-solid fa-plus"></i><input type="text" id="new-cat-name" placeholder="যেমন: Movie, Funny"></div>
+                <button class="btn btn-info" style="width:120px;" onclick="addCategory()">Add</button>
+            </div>
+        </div>
+        <div id="category-list" style="margin-top:15px;"></div>
+    </div>
+
+    <!-- Upload Video -->
+    <div class="card">
+        <div class="card-header"><div class="title-group"><i class="fa-solid fa-cloud-arrow-up"></i><h3>নতুন ভিডিও আপলোড করুন</h3></div></div>
+        <div class="grid-2">
+            <div class="input-group"><label>ভিডিওর শিরোনাম</label><div class="input-wrapper"><i class="fa-solid fa-heading"></i><input type="text" id="add-title" placeholder="ভিডিওর নাম দিন"></div></div>
+            <div class="input-group">
+                <label>ক্যাটাগরি</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-list"></i>
+                    <select id="add-category">
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="input-group"><label>থাম্বনেইল লিংক (Image URL)</label><div class="input-wrapper"><i class="fa-solid fa-image"></i><input type="text" id="add-thumb" placeholder="ছবির লিংক"></div></div>
+        <div class="input-group"><label>ভিডিও লিংক (YT/TG/MP4)</label><div class="input-wrapper"><i class="fa-solid fa-video"></i><input type="text" id="add-url" placeholder="ভিডিওর লিংক"></div></div>
+        
+        <h4 style="margin:15px 0 10px; border-bottom:1px solid #333; padding-bottom:5px; color:#f39c12;">ফুল কালেকশন আনলক সেটিংস (ঐচ্ছিক)</h4>
+        <div class="grid-2">
+            <div class="input-group"><label>ফুল কালেকশন লিংক</label><div class="input-wrapper"><i class="fa-solid fa-link"></i><input type="text" id="add-fc-url" placeholder="লিংক না দিলে বাটন শো করবে না"></div></div>
+            <div class="input-group"><label>কতটি অ্যাড দেখতে হবে?</label><div class="input-wrapper"><i class="fa-solid fa-eye"></i><input type="number" id="add-fc-ads" placeholder="যেমন: 5"></div></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="uploadVideo()"><i class="fa-solid fa-paper-plane"></i> ভিডিও পাবলিশ করুন</button>
+    </div>
+
+    <!-- Video Management -->
+    <div class="card">
+        <div class="card-header"><div class="title-group"><i class="fa-solid fa-server"></i><h3>ভিডিও ম্যানেজমেন্ট</h3></div></div>
+        <div id="video-manage-list"><p style="text-align:center; color:#777;">ডেটা লোড হচ্ছে...</p></div>
+    </div>
+</div>
+
+<!-- Edit Video Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <i class="fa-solid fa-xmark close-btn" onclick="document.getElementById('editModal').style.display='none'"></i>
+        <h3 style="color:var(--primary); margin-bottom:20px;"><i class="fa-solid fa-pen"></i> ভিডিও আপডেট</h3>
+        <input type="hidden" id="edit-id">
+        <div class="input-group"><label>শিরোনাম</label><div class="input-wrapper"><i class="fa-solid fa-heading"></i><input type="text" id="edit-title"></div></div>
+        <div class="input-group"><label>ক্যাটাগরি</label><div class="input-wrapper"><i class="fa-solid fa-list"></i><select id="edit-category"></select></div></div>
+        <div class="input-group"><label>থাম্বনেইল লিংক</label><div class="input-wrapper"><i class="fa-solid fa-image"></i><input type="text" id="edit-thumb"></div></div>
+        <div class="input-group"><label>ভিডিও লিংক</label><div class="input-wrapper"><i class="fa-solid fa-video"></i><input type="text" id="edit-url"></div></div>
+        
+        <h4 style="margin:15px 0 10px; border-bottom:1px solid #333; padding-bottom:5px; color:#f39c12;">ফুল কালেকশন আনলক সেটিংস</h4>
+        <div class="input-group"><label>ফুল কালেকশন লিংক</label><div class="input-wrapper"><i class="fa-solid fa-link"></i><input type="text" id="edit-fc-url"></div></div>
+        <div class="input-group" style="margin-bottom:20px;"><label>কতটি অ্যাড দেখতে হবে?</label><div class="input-wrapper"><i class="fa-solid fa-eye"></i><input type="number" id="edit-fc-ads"></div></div>
+
+        <button class="btn btn-info" onclick="saveEditVideo()"><i class="fa-solid fa-arrows-rotate"></i> আপডেট সেভ করুন</button>
+    </div>
+</div>
+
+<!-- Comment Management Modal -->
+<div id="commentModal" class="modal">
+    <div class="modal-content">
+        <i class="fa-solid fa-xmark close-btn" onclick="document.getElementById('commentModal').style.display='none'"></i>
+        <h3 style="color:var(--primary); margin-bottom:20px;"><i class="fa-solid fa-comments"></i> কমেন্ট ম্যানেজমেন্ট</h3>
+        <div id="admin-comment-list"></div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBKPhGqUqwLqnXYkCHZmITNiH3DeMnYrqQ",
+  authDomain: "stream-x-cea29.firebaseapp.com",
+  databaseURL: "https://stream-x-cea29-default-rtdb.firebaseio.com",
+  projectId: "stream-x-cea29",
+  storageBucket: "stream-x-cea29.firebasestorage.app",
+  messagingSenderId: "719834712304",
+  appId: "1:719834712304:web:6d4247e2e45c789002da35",
+  measurementId: "G-NGTK5B5M82"
+};
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    db.ref('online_users').on('value', (snapshot) => { document.getElementById('live-count').innerText = snapshot.numChildren() || 0; });
+
+    // Load Settings
+    db.ref('settings').on('value', (snap) => {
+        if (snap.exists()) {
+            const data = snap.val();
+            document.getElementById('set-site-name').value = data.siteName || "";
+            document.getElementById('set-tg-app-url').value = data.tgAppUrl || "";
+            document.getElementById('set-ad-interval').value = data.adInterval || "";
+            document.getElementById('set-adsgram-id').value = data.adsgramId || "";
+            document.getElementById('set-monetag-zone').value = data.monetagZone || "";
+            document.getElementById('set-idle-time').value = data.idleAdInterval || "";
+            document.getElementById('set-idle-adsgram-id').value = data.idleAdsgramId || "";
+        }
+    });
+
+    function saveSettings() {
+        db.ref('settings').set({
+            siteName: document.getElementById('set-site-name').value,
+            tgAppUrl: document.getElementById('set-tg-app-url').value,
+            adInterval: document.getElementById('set-ad-interval').value,
+            adsgramId: document.getElementById('set-adsgram-id').value,
+            monetagZone: document.getElementById('set-monetag-zone').value,
+            idleAdInterval: document.getElementById('set-idle-time').value,
+            idleAdsgramId: document.getElementById('set-idle-adsgram-id').value
+        }).then(() => alert("✅ সেটিংস সেভ হয়েছে!"));
+    }
+
+    // Category Logic
+    db.ref('categories').on('value', snap => {
+        const catList = document.getElementById('category-list');
+        const uploadSelect = document.getElementById('add-category');
+        const editSelect = document.getElementById('edit-category');
+        
+        catList.innerHTML = ''; uploadSelect.innerHTML = '<option value="Others">Others</option>'; editSelect.innerHTML = '<option value="Others">Others</option>';
+        
+        const cats = snap.val();
+        if(cats) {
+            Object.keys(cats).forEach(id => {
+                const name = cats[id].name;
+                catList.innerHTML += `<div class="cat-item"><span><i class="fa-solid fa-folder"></i> ${name}</span><button onclick="deleteCat('${id}')"><i class="fa-solid fa-trash"></i></button></div>`;
+                uploadSelect.innerHTML += `<option value="${name}">${name}</option>`;
+                editSelect.innerHTML += `<option value="${name}">${name}</option>`;
+            });
+        }
+    });
+
+    function addCategory() {
+        const name = document.getElementById('new-cat-name').value.trim();
+        if(name === '') return alert("ক্যাটাগরির নাম লিখুন!");
+        db.ref('categories').push({ name: name }).then(() => { document.getElementById('new-cat-name').value = ''; });
+    }
+    function deleteCat(id) { if(confirm("এই ক্যাটাগরি ডিলিট করবেন?")) db.ref('categories/'+id).remove(); }
+
+    function uploadVideo() {
+        const t = document.getElementById('add-title').value; const c = document.getElementById('add-category').value || "Others";
+        const th = document.getElementById('add-thumb').value; const u = document.getElementById('add-url').value;
+        const fcUrl = document.getElementById('add-fc-url').value; const fcAds = parseInt(document.getElementById('add-fc-ads').value) || 0;
+        
+        if(!t || !u) return alert("⚠️ শিরোনাম এবং ভিডিও লিংক দিন!");
+        db.ref('videos').push({ 
+            title: t, category: c, thumb: th, url: u, 
+            fullCollectionUrl: fcUrl, fullCollectionAds: fcAds,
+            views: 0, likes: 0, dislikes: 0, timestamp: Date.now() 
+        })
+        .then(() => { 
+            alert("✅ আপলোড সম্পন্ন!"); 
+            document.getElementById('add-title').value = ""; document.getElementById('add-thumb').value = ""; 
+            document.getElementById('add-url').value = ""; document.getElementById('add-fc-url').value = ""; document.getElementById('add-fc-ads').value = "";
+        });
+    }
+
+    db.ref('videos').on('value', (snapshot) => {
+        const container = document.getElementById('video-manage-list');
+        const data = snapshot.val(); container.innerHTML = '';
+        if(!data) return container.innerHTML = '<p style="text-align:center; color:#777;">কোনো ভিডিও নেই!</p>';
+        
+        Object.keys(data).reverse().forEach((id) => {
+            const v = data[id];
+            let cCount = v.comments ? Object.keys(v.comments).length : 0;
+            container.innerHTML += `
+                <div class="video-item">
+                    <div class="v-title">${v.title}</div>
+                    <div class="v-stats">
+                        <span class="badge" style="color:#00e676; border-color:#00e676"><i class="fa-solid fa-folder"></i> ${v.category || 'Others'}</span>
+                        <span class="badge"><i class="fa-solid fa-eye"></i> ${v.views || 0}</span>
+                        <span class="badge"><i class="fa-solid fa-thumbs-up"></i> ${v.likes || 0}</span>
+                        <span class="badge" style="color:#007bff; border-color:#007bff"><i class="fa-solid fa-comments"></i> ${cCount} Comments</span>
+                        ${v.fullCollectionUrl ? `<span class="badge" style="color:#f39c12; border-color:#f39c12"><i class="fa-solid fa-link"></i> FC Active</span>` : ''}
+                    </div>
+                    <div class="v-actions">
+                        <button class="btn btn-warning" onclick="manageComments('${id}')"><i class="fa-solid fa-comments"></i> কমেন্টস</button>
+                        <button class="btn btn-info" onclick="openEditModal('${id}')"><i class="fa-solid fa-pen"></i> এডিট</button>
+                        <button class="btn btn-danger" onclick="deleteVideo('${id}')"><i class="fa-solid fa-trash"></i> ডিলিট</button>
+                    </div>
+                </div>`;
+        });
+    });
+
+    function deleteVideo(id) { if(confirm("⚠️ ডিলিট করবেন?")) db.ref('videos/' + id).remove(); }
+
+    function openEditModal(id) {
+        db.ref('videos/' + id).once('value').then(snap => {
+            let v = snap.val();
+            document.getElementById('edit-id').value = id; 
+            document.getElementById('edit-title').value = v.title;
+            document.getElementById('edit-category').value = v.category || "Others"; 
+            document.getElementById('edit-thumb').value = v.thumb;
+            document.getElementById('edit-url').value = v.url; 
+            document.getElementById('edit-fc-url').value = v.fullCollectionUrl || ""; 
+            document.getElementById('edit-fc-ads').value = v.fullCollectionAds || ""; 
+            document.getElementById('editModal').style.display = 'flex';
+        });
+    }
+
+    function saveEditVideo() {
+        const id = document.getElementById('edit-id').value;
+        db.ref('videos/' + id).update({
+            title: document.getElementById('edit-title').value, 
+            category: document.getElementById('edit-category').value || "Others",
+            thumb: document.getElementById('edit-thumb').value, 
+            url: document.getElementById('edit-url').value,
+            fullCollectionUrl: document.getElementById('edit-fc-url').value,
+            fullCollectionAds: parseInt(document.getElementById('edit-fc-ads').value) || 0
+        }).then(() => { alert("✅ আপডেট হয়েছে!"); document.getElementById('editModal').style.display = 'none'; });
+    }
+
+    let activeVideoForComment = null;
+    function manageComments(vidId) {
+        activeVideoForComment = vidId; document.getElementById('commentModal').style.display = 'flex';
+        db.ref('videos/' + vidId + '/comments').on('value', snap => {
+            if(activeVideoForComment !== vidId) return;
+            const list = document.getElementById('admin-comment-list'); list.innerHTML = '';
+            const comments = snap.val();
+            if(!comments) return list.innerHTML = '<p style="text-align:center; color:#777;">এই ভিডিওতে কোনো কমেন্ট নেই।</p>';
+            Object.keys(comments).reverse().forEach(cid => {
+                let c = comments[cid];
+                list.innerHTML += `
+                    <div class="adm-comment">
+                        <strong><i class="fa-solid fa-user"></i> ${c.userName}</strong>
+                        <p>${c.text}</p>
+                        ${c.adminReply ? `<div class="admin-reply-box"><strong>Admin Reply:</strong> ${c.adminReply}</div>` : ''}
+                        <div class="adm-comment-actions">
+                            <button onclick="editComment('${vidId}', '${cid}', '${c.text.replace(/'/g, "\\'")}')"><i class="fa-solid fa-pen"></i> Edit</button>
+                            <button onclick="replyComment('${vidId}', '${cid}', '${(c.adminReply||'').replace(/'/g, "\\'")}')"><i class="fa-solid fa-reply"></i> Reply</button>
+                            <button onclick="deleteComment('${vidId}', '${cid}')" style="color:#ff1744;"><i class="fa-solid fa-trash"></i> Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+        });
+    }
+
+    function editComment(vidId, cid, oldText) { let newText = prompt("কমেন্ট এডিট করুন:", oldText); if(newText !== null && newText.trim() !== "") db.ref(`videos/${vidId}/comments/${cid}`).update({ text: newText.trim() }); }
+    function replyComment(vidId, cid, oldReply) { let reply = prompt("অ্যাডমিন রিপ্লাই দিন:", oldReply); if(reply !== null) db.ref(`videos/${vidId}/comments/${cid}`).update({ adminReply: reply.trim() }); }
+    function deleteComment(vidId, cid) { if(confirm("এই কমেন্টটি ডিলিট করতে চান?")) db.ref(`videos/${vidId}/comments/${cid}`).remove(); }
+</script>
+</body>
+</html>

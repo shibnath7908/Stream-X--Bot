@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title id="site-title">StreamX - Pro Video Engine</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root { --primary: #ff003c; --bg: #08080a; --card: #121214; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        html { scroll-behavior: smooth; }
+        body { background: var(--bg); color: #fff; padding-bottom: 50px; min-height: 100vh; -webkit-user-select: none; user-select: none; }
+        
+        header { background: rgba(0,0,0,0.95); padding: 15px 15px 5px 15px; position: sticky; top: 0; border-bottom: 2px solid var(--primary); z-index: 1000; text-align: center; }
+        .live-status { font-size: 13px; color: #ff4d4d; margin-top: 5px; display: flex; justify-content: center; align-items: center; gap: 5px; }
+        .dot { height: 8px; width: 8px; background-color: #ff0000; border-radius: 50%; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+
+        .search-box { width: 90%; max-width: 500px; margin: 10px auto; }
+        .search-box input { width: 100%; padding: 10px 15px; border-radius: 25px; border: 1px solid #333; background: #1a1a1a; color: white; outline: none; }
+
+        .category-bar { display: flex; gap: 10px; overflow-x: auto; padding: 10px 5px; width: 90%; max-width: 600px; margin: 0 auto; scrollbar-width: none; }
+        .category-bar::-webkit-scrollbar { display: none; }
+        .cat-btn { background: #1a1a1a; color: #fff; border: 1px solid #333; padding: 8px 20px; border-radius: 20px; cursor: pointer; white-space: nowrap; font-size: 14px; transition: 0.3s; flex-shrink: 0; }
+        .cat-btn.active { background: var(--primary); border-color: var(--primary); font-weight: bold; }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid #222; position: relative; display: flex; flex-direction: column; }
+        
+        .video-wrapper { width: 100%; aspect-ratio: 16/9; position: relative; background: #000; overflow: hidden; }
+        .video-wrapper img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        
+        .lock-screen { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 30; }
+        .lock-icon { font-size: 40px; background: var(--primary); border-radius: 50%; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; box-shadow: 0 0 15px rgba(255,0,60,0.5); }
+
+        .video-container { width: 100%; height: 100%; display: none; position: absolute; top: 0; left: 0; z-index: 20; background: #000; }
+        iframe, video { width: 100%; height: 100%; border: none; outline: none; }
+
+        /* মিড-রোল অ্যাড ওভারলে */
+        .ad-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+        .ad-content { background: var(--primary); color: white; padding: 12px 25px; border-radius: 30px; font-weight: bold; font-size: 15px; box-shadow: 0 0 15px rgba(255,0,60,0.5); animation: pulse 1.5s infinite; text-align: center; }
+        .ad-text-small { font-size: 12px; color: #ccc; margin-top: 10px; text-align: center; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        .info { padding: 15px; }
+        .v-time { font-size: 13px; color: #888; display: block; margin-top: 5px; margin-bottom: 12px; }
+        .btn-unlock { background: var(--primary); color: #fff; border: none; padding: 12px; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; font-size: 15px; }
+        
+        .stats-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 14px; color: #aaa; flex-wrap: wrap; gap: 10px; }
+        .react-group { display: flex; gap: 12px; }
+        .react-btn { background: #222; border: 1px solid #444; color: white; padding: 8px 18px; border-radius: 20px; cursor: pointer; font-size: 15px; font-weight: bold; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); transition: 0.3s; }
+        .react-btn:hover:not(:disabled) { background: #333; }
+        .react-btn.active-like { background: #00c853; border-color: #00c853; }
+        .react-btn.active-dislike { background: #ff3d00; border-color: #ff3d00; }
+        .react-btn.comment-btn { background: #1a1a2e; border-color: #0f3460; box-shadow: inset 0 2px 4px rgba(255,255,255,0.1), 0 2px 5px rgba(0,0,0,0.5); }
+        .react-btn:disabled { cursor: not-allowed; opacity: 0.7; }
+        
+        .action-row { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-full-collection { background: #f39c12; color: #fff; border: none; padding: 12px; flex: 1; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .btn-full-collection:hover { opacity: 0.9; transform: scale(0.98); }
+        .copy-btn-small { background: #222; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: 0.3s; flex-shrink: 0; }
+        .copy-btn-small:hover { background: #333; }
+
+        /* Comment Modal */
+        .comment-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: flex-end; justify-content: center; }
+        .comment-content { background: var(--card); width: 100%; max-width: 600px; height: 75vh; border-radius: 20px 20px 0 0; display: flex; flex-direction: column; position: relative; border-top: 2px solid var(--primary); }
+        .comment-header { padding: 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 18px; }
+        .close-comment { background: #333; border-radius: 50%; width: 30px; height: 30px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 18px; }
+        .comment-list { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+        .comment-item { background: #1a1a1a; padding: 15px; border-radius: 12px; border-left: 3px solid #444; }
+        .comment-item strong { color: var(--primary); font-size: 15px; }
+        .comment-item p { font-size: 15px; margin-top: 5px; color: #eee; }
+        .admin-reply { margin-top: 10px; background: rgba(0,200,83,0.1); padding: 10px; border-radius: 8px; border-left: 3px solid #00c853; font-size: 14px; color: #ddd; }
+        .admin-reply strong { color: #00c853; }
+        .comment-input-area { padding: 15px; background: #111; display: flex; gap: 10px; border-top: 1px solid #222; }
+        .comment-input-area input { flex: 1; padding: 15px; border-radius: 25px; border: 1px solid #333; background: #222; color: white; outline: none; font-size: 15px; }
+        .comment-input-area button { background: var(--primary); color: white; border: none; padding: 0 25px; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 15px; }
+
+        /* Idle Ad Popup UI */
+        .idle-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
+        .idle-box { background: var(--card); border: 2px solid var(--primary); padding: 30px 20px; border-radius: 15px; text-align: center; max-width: 400px; width: 100%; box-shadow: 0 0 20px rgba(255,0,60,0.4); }
+        .idle-box p { font-size: 16px; margin-bottom: 25px; color: #fff; line-height: 1.5; font-weight: bold; }
+        .idle-btn { background: var(--primary); color: #fff; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-weight: bold; font-size: 15px; transition: 0.3s; animation: pulse 1.5s infinite; }
+        .idle-btn:hover { background: #d00030; transform: scale(1.05); }
+    </style>
+</head>
+<body oncontextmenu="return false;" ondragstart="return false;" ondrop="return false;">
+
+<header>
+    <h2 style="color:var(--primary)" id="site-name">STREAMX 🎥</h2>
+    <div class="live-status"><span class="dot"></span> <span id="user-count">0</span> জন অনলাইনে আছেন</div>
+    <div class="search-box"><input type="text" id="searchInput" placeholder="ভিডিও খুঁজুন..." onkeyup="searchVideo()"></div>
+    <div class="category-bar" id="category-container">
+        <button class="cat-btn active" id="cat-btn-All" onclick="filterCategory('All', this)">All</button>
+    </div>
+</header>
+
+<div class="container" id="video-list"></div>
+
+<!-- Comment Modal -->
+<div id="commentModal" class="comment-modal">
+    <div class="comment-content">
+        <div class="comment-header">
+            <span>💬 কমেন্টস (<span id="modal-comment-count">0</span>)</span>
+            <div class="close-comment" onclick="closeComments()">&times;</div>
+        </div>
+        <div class="comment-list" id="comment-list-container"></div>
+        <div class="comment-input-area">
+            <input type="text" id="new-comment-text" placeholder="আপনার মতামত লিখুন...">
+            <button onclick="postComment()">সেন্ড</button>
+        </div>
+    </div>
+</div>
+
+<!-- Idle Ads Prompt Modal -->
+<div id="idle-popup" class="idle-modal">
+    <div class="idle-box">
+        <p>আপনি কি ভিডিও দেখতে চান বা ওয়েবসাইটে থাকতে চান?</p>
+        <button class="idle-btn" onclick="handleIdlePopupContinue()">কন্টিনিউ করুন</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('keydown', e => { if (e.ctrlKey &&['c','s','u','p'].includes(e.key)) e.preventDefault(); });
+    if (window.Telegram && window.Telegram.WebApp) { window.Telegram.WebApp.expand(); }
+
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY_HERE",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ভেরিয়েবল
+    let monetagZone = ""; let adsgramId = ""; let adTimesArray =[]; let tgAppUrl = ""; 
+    let adsgramController = null;
+    let currentVideoForComment = null; 
+    let tgUserName = "Unknown User";
+
+    let isAnyVideoPlaying = false;
+    let idleTimeout = null; let idleAdInterval = 0; let idleAdsgramId = ""; let idleAdsgramController = null;
+
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+        let u = window.Telegram.WebApp.initDataUnsafe.user;
+        tgUserName = (u.first_name + " " + (u.last_name || "")).trim();
+    }
+
+    db.ref('settings').on('value', (snap) => {
+        const data = snap.val() || {};
+        document.getElementById('site-name').innerText = data.siteName || "STREAMX 🎥";
+        tgAppUrl = data.tgAppUrl || ""; 
+        adTimesArray = (data.adInterval || "").toString().split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        
+        if (data.adsgramId && data.adsgramId !== adsgramId) {
+            adsgramId = data.adsgramId;
+            if (window.Adsgram) { adsgramController = window.Adsgram.init({ blockId: adsgramId }); }
+        }
+
+        if (data.monetagZone && data.monetagZone !== monetagZone) {
+            monetagZone = data.monetagZone;
+            let oldScript = document.getElementById('monetag-script'); if(oldScript) oldScript.remove();
+            let script = document.createElement('script'); script.id = 'monetag-script'; script.src = '//libtl.com/sdk.js';
+            script.setAttribute('data-zone', monetagZone); script.setAttribute('data-sdk', `show_${monetagZone}`);
+            document.head.appendChild(script);
+        }
+
+        idleAdInterval = parseInt(data.idleAdInterval) || 0;
+        if(data.idleAdsgramId && data.idleAdsgramId !== idleAdsgramId) {
+            idleAdsgramId = data.idleAdsgramId;
+            if(window.Adsgram) idleAdsgramController = window.Adsgram.init({ blockId: idleAdsgramId });
+        }
+        resetIdleTimer();
+    });
+
+    const userRef = db.ref('online_users').push();
+    db.ref('.info/connected').on('value', s => { if(s.val()){ userRef.onDisconnect().remove(); userRef.set(true); }});
+    db.ref('online_users').on('value', s => { document.getElementById('user-count').innerText = s.numChildren(); });
+
+    let targetVideoId = new URLSearchParams(window.location.search).get('v') || window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+    let scrolledToTarget = false;
+
+    db.ref('categories').on('value', snap => {
+        const catContainer = document.getElementById('category-container');
+        catContainer.innerHTML = `<button class="cat-btn active" id="cat-btn-All" onclick="filterCategory('All', this)">All</button>`;
+        const cats = snap.val();
+        if(cats) { Object.values(cats).forEach(c => { catContainer.innerHTML += `<button class="cat-btn" onclick="filterCategory('${c.name}', this)">${c.name}</button>`; }); }
+    });
+
+    function timeAgo(time) {
+        if(!time) return '';
+        const seconds = Math.floor((new Date() - time) / 1000);
+        let interval = seconds / 31536000; if (interval > 1) return Math.floor(interval) + " বছর আগে";
+        interval = seconds / 2592000; if (interval > 1) return Math.floor(interval) + " মাস আগে";
+        interval = seconds / 86400; if (interval > 1) return Math.floor(interval) + " দিন আগে";
+        interval = seconds / 3600; if (interval > 1) return Math.floor(interval) + " ঘণ্টা আগে";
+        interval = seconds / 60; if (interval > 1) return Math.floor(interval) + " মিনিট আগে";
+        return "কয়েক সেকেন্ড আগে";
+    }
+
+    const list = document.getElementById('video-list');
+
+    db.ref('videos').on('child_added', (snapshot) => {
+        const id = snapshot.key; const v = snapshot.val();
+        let isYT = v.url.includes('youtu'); let isTG = v.url.includes('t.me/');
+        let playerHtml = isYT ? `<iframe id="player-${id}" src="https://www.youtube.com/embed/${v.url.split('v=')[1] || v.url.split('/').pop()}?autoplay=0" allowfullscreen></iframe>` : 
+                         isTG ? `<iframe id="player-${id}" src="${v.url}?embed=1" allowfullscreen></iframe>` : 
+                         `<video id="player-${id}" controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline oncontextmenu="return false;"><source src="${v.url}" type="video/mp4"></video>`;
+
+        let commentCount = v.comments ? Object.keys(v.comments).length : 0;
+        
+        let fcHtml = '';
+        let copyBtnStyle = 'flex: 1; font-weight: bold; font-size: 14px;';
+        let copyBtnContent = '<i class="fa-solid fa-link"></i> Copy Link 🔗';
+
+        if (v.fullCollectionUrl && v.fullCollectionUrl.trim() !== "") {
+            let reqAds = parseInt(v.fullCollectionAds) || 0;
+            let currentProgress = parseInt(localStorage.getItem('fc_progress_' + id)) || 0;
+            
+            let btnText = currentProgress >= reqAds ? '<i class="fa-solid fa-unlock"></i> ফুল কালেকশন ওপেন করুন' : `<i class="fa-solid fa-lock"></i> ফুল কালেকশন (${currentProgress}/${reqAds})`;
+            let btnColor = currentProgress >= reqAds ? '#00c853' : '#f39c12';
+            
+            fcHtml = `<button class="btn-full-collection" id="fc-btn-${id}" style="background:${btnColor};" onclick="handleFC('${id}', '${v.fullCollectionUrl}', ${reqAds})">${btnText}</button>`;
+            copyBtnStyle = 'width: 50px; font-size: 18px; flex-shrink: 0;';
+            copyBtnContent = '<i class="fa-solid fa-link"></i>';
+        }
+
+        // অ্যাড ওভারলে সহ ভিডিও কন্টেইনার যুক্ত করা হয়েছে
+        list.insertAdjacentHTML('afterbegin', `
+            <div class="card" id="card-${id}" data-title="${v.title.toLowerCase()}" data-category="${v.category || 'Others'}">
+                <div class="video-wrapper">
+                    <div class="lock-screen" id="lock-${id}" onclick="initUnlock('${id}')"><div class="lock-icon">▶</div></div>
+                    
+                    <div class="video-container" id="container-${id}">
+                        ${playerHtml}
+                        <div class="ad-overlay" id="ad-overlay-${id}" onclick="triggerMidAd('${id}')">
+                            <div class="ad-content"><i class="fa-solid fa-play"></i> অ্যাড দেখুন এবং কন্টিনিউ করুন</div>
+                            <span class="ad-text-small">ভিডিও শুরু করার জন্য ২ টি অ্যাড দেখতে হবে</span>
+                        </div>
+                    </div>
+
+                    <img src="${v.thumb}" id="img-${id}" draggable="false">
+                </div>
+                <div class="info">
+                    <h3 id="title-${id}">${v.title}</h3>
+                    <span class="v-time"><i class="fa-regular fa-clock"></i> আপলোড হয়েছে: ${timeAgo(v.timestamp)}</span>
+                    
+                    <div class="stats-row">
+                        <div style="font-size: 14px; font-weight:bold;">👁️ <span id="views-${id}">${v.views || 0}</span> Views</div>
+                        <span id="cat-tag-${id}" style="background:#222; padding:4px 12px; border-radius:12px; border:1px solid #444;">${v.category || 'Others'}</span>
+                    </div>
+
+                    <div class="react-group">
+                        <button id="like-btn-${id}" class="react-btn" onclick="handleReact('${id}', 'like')"><i class="fa-solid fa-thumbs-up"></i> <span id="likes-${id}">${v.likes || 0}</span></button>
+                        <button id="dislike-btn-${id}" class="react-btn" onclick="handleReact('${id}', 'dislike')"><i class="fa-solid fa-thumbs-down"></i></button>
+                        <button class="react-btn comment-btn" onclick="openComments('${id}')"><i class="fa-solid fa-comment-dots"></i> <span id="comments-count-${id}">${commentCount}</span></button>
+                    </div>
+                    
+                    <button class="btn-unlock" id="btn-${id}" onclick="initUnlock('${id}')"><i class="fa-solid fa-play"></i> Play Video</button>
+                    
+                    <div class="action-row">
+                        ${fcHtml}
+                        <button class="copy-btn-small" onclick="copyLink('${id}')" style="${copyBtnStyle}">${copyBtnContent}</button>
+                    </div>
+                </div>
+            </div>
+        `);
+
+        if(localStorage.getItem('react_' + id)) { document.getElementById('like-btn-' + id).disabled = true; document.getElementById('dislike-btn-' + id).disabled = true; }
+
+        if (targetVideoId === id && !scrolledToTarget) {
+            scrolledToTarget = true;
+            setTimeout(() => document.getElementById('card-' + id).scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
+        }
+
+        setTimeout(() => {
+            const vid = document.getElementById('player-' + id);
+            if (vid && vid.tagName === 'VIDEO') {
+                vid.shownAds = new Set(); 
+                vid.addEventListener('play', () => { stopOtherVideos(id); isAnyVideoPlaying = true; if(idleTimeout) clearTimeout(idleTimeout); });
+                vid.addEventListener('pause', () => { isAnyVideoPlaying = false; resetIdleTimer(); });
+                vid.addEventListener('ended', () => { isAnyVideoPlaying = false; resetIdleTimer(); });
+                
+                vid.addEventListener('timeupdate', () => {
+                    let ct = Math.floor(vid.currentTime);
+                    if (ct >= 7 && !localStorage.getItem('viewed_' + id)) {
+                        db.ref('videos/' + id + '/views').transaction(v => (v || 0) + 1); localStorage.setItem('viewed_' + id, 'true');
+                    }
+                    
+                    // নির্দিষ্ট সময়ে ভিডিও পজ করে অ্যাড ওভারলে শো করা
+                    if (adTimesArray.includes(ct) && !vid.shownAds.has(ct)) {
+                        vid.pause(); vid.shownAds.add(ct);
+                        document.getElementById('ad-overlay-' + id).style.display = 'flex';
+                    }
+                });
+            } else if (vid) {
+                setTimeout(() => {
+                    if (!localStorage.getItem('viewed_' + id)) {
+                        db.ref('videos/' + id + '/views').transaction(v => (v || 0) + 1); localStorage.setItem('viewed_' + id, 'true');
+                    }
+                }, 7000);
+            }
+        }, 100);
+    });
+
+    db.ref('videos').on('child_changed', (snapshot) => {
+        const id = snapshot.key; const v = snapshot.val();
+        if(document.getElementById('views-'+id)) document.getElementById('views-'+id).innerText = v.views || 0;
+        if(document.getElementById('likes-'+id)) document.getElementById('likes-'+id).innerText = v.likes || 0;
+        let cCount = v.comments ? Object.keys(v.comments).length : 0;
+        if(document.getElementById('comments-count-'+id)) document.getElementById('comments-count-'+id).innerText = cCount;
+        if(currentVideoForComment === id) { renderComments(v.comments); }
+
+        let fcBtn = document.getElementById('fc-btn-' + id);
+        if(fcBtn && v.fullCollectionUrl) {
+            let reqAds = parseInt(v.fullCollectionAds) || 0;
+            let currentProgress = parseInt(localStorage.getItem('fc_progress_' + id)) || 0;
+            if(currentProgress >= reqAds) {
+                fcBtn.innerHTML = '<i class="fa-solid fa-unlock"></i> ফুল কালেকশন ওপেন করুন'; fcBtn.style.background = '#00c853';
+            } else {
+                fcBtn.innerHTML = `<i class="fa-solid fa-lock"></i> ফুল কালেকশন (${currentProgress}/${reqAds})`; fcBtn.style.background = '#f39c12';
+            }
+            fcBtn.onclick = function() { handleFC(id, v.fullCollectionUrl, reqAds); };
+        }
+    });
+
+    db.ref('videos').on('child_removed', (snapshot) => { if(document.getElementById('card-' + snapshot.key)) document.getElementById('card-' + snapshot.key).remove(); });
+
+    // Idle Ad Logic Updated: প্রথমে কনফার্মেশন পপআপ আসবে
+    function resetIdleTimer() {
+        if(idleTimeout) clearTimeout(idleTimeout);
+        if(isAnyVideoPlaying || idleAdInterval <= 0) return;
+        idleTimeout = setTimeout(() => {
+            if(idleAdsgramController) { 
+                document.getElementById('idle-popup').style.display = 'flex'; 
+            }
+        }, idleAdInterval * 1000);
+    }
+    ['mousemove', 'mousedown', 'keypress', 'touchmove', 'touchstart'].forEach(evt => document.addEventListener(evt, resetIdleTimer, true));
+
+    // আইডল পপআপ এর কন্টিনিউ বাটনে ক্লিক করলে পরপর ২টি অ্যাড আসবে
+    function handleIdlePopupContinue() {
+        document.getElementById('idle-popup').style.display = 'none';
+        if(idleAdsgramController) {
+            idleAdsgramController.show()
+                .then(() => {
+                    // প্রথম অ্যাড শেষ হলে দ্বিতীয় অ্যাড দেখাবে
+                    idleAdsgramController.show().then(() => resetIdleTimer()).catch(() => resetIdleTimer());
+                })
+                .catch(() => {
+                    // প্রথমটি ফেইল করলেও দ্বিতীয়টি ট্রাই করবে
+                    idleAdsgramController.show().then(() => resetIdleTimer()).catch(() => resetIdleTimer());
+                });
+        } else {
+            resetIdleTimer();
+        }
+    }
+
+    function handleReact(id, type) {
+        if(localStorage.getItem('react_' + id)) return;
+        db.ref('videos/' + id + '/' + type + 's').transaction(v => (v || 0) + 1);
+        localStorage.setItem('react_' + id, type);
+        document.getElementById('like-btn-' + id).disabled = true; document.getElementById('dislike-btn-' + id).disabled = true;
+    }
+
+    // Full Collection Unlock Logic
+    function handleFC(id, url, reqAds) {
+        let prog = parseInt(localStorage.getItem('fc_progress_' + id)) || 0;
+        if (prog >= reqAds) {
+            window.open(url, '_blank');
+        } else {
+            showAdNetwork(() => {
+                prog++;
+                localStorage.setItem('fc_progress_' + id, prog);
+                let btn = document.getElementById('fc-btn-' + id);
+                if(prog >= reqAds) {
+                    btn.innerHTML = '<i class="fa-solid fa-unlock"></i> ফুল কালেকশন ওপেন করুন';
+                    btn.style.background = '#00c853';
+                    alert("✅ আনলক সম্পন্ন হয়েছে!");
+                } else {
+                    btn.innerHTML = `<i class="fa-solid fa-lock"></i> ফুল কালেকশন (${prog}/${reqAds})`;
+                }
+            });
+        }
+    }
+
+    // Universal Ad Function
+    function showAdNetwork(callback) {
+        let monetagFunc = window[`show_${monetagZone}`];
+        if (adsgramController) {
+            adsgramController.show().then(callback).catch(() => {
+                if (typeof monetagFunc === 'function') { monetagFunc().then(callback).catch(callback); } else { callback(); }
+            });
+        } else if (typeof monetagFunc === 'function') {
+            monetagFunc().then(callback).catch(callback);
+        } else { callback(); }
+    }
+
+    function stopOtherVideos(currentId) {
+        document.querySelectorAll('video').forEach(vid => { if (vid.id !== 'player-' + currentId) vid.pause(); });
+        document.querySelectorAll('.video-container iframe').forEach(iframe => {
+            if (iframe.id !== 'player-' + currentId && document.getElementById(iframe.id.replace('player-', 'container-')).style.display === 'block') {
+                let tempSrc = iframe.src; iframe.src = ''; iframe.src = tempSrc;
+            }
+        });
+    }
+
+    function initUnlock(id) {
+        document.getElementById('lock-' + id).style.display = 'none'; document.getElementById('img-' + id).style.display = 'none';
+        document.getElementById('btn-' + id).style.display = 'none'; document.getElementById('container-' + id).style.display = 'block';
+        stopOtherVideos(id); isAnyVideoPlaying = true; if(idleTimeout) clearTimeout(idleTimeout);
+        const p = document.getElementById('player-' + id);
+        if(p.tagName === "VIDEO") { p.muted = false; p.play().catch(e=>console.log(e)); }
+    }
+
+    // বাটন ক্লিক করার পর পরপর ২ টি অ্যাড শো হবে এবং তারপর ভিডিও প্লে হবে
+    function triggerMidAd(id) {
+        document.getElementById('ad-overlay-' + id).style.display = 'none';
+        const vid = document.getElementById('player-' + id);
+        
+        // প্রথম অ্যাড কল করা হচ্ছে
+        showAdNetwork(() => { 
+            // প্রথম অ্যাড শেষ হওয়ার পর দ্বিতীয় অ্যাড কল করা হচ্ছে
+            showAdNetwork(() => {
+                if(vid && vid.tagName==='VIDEO') vid.play(); 
+            });
+        });
+    }
+
+    function openComments(id) { currentVideoForComment = id; document.getElementById('commentModal').style.display = 'flex'; db.ref('videos/' + id + '/comments').once('value', snap => renderComments(snap.val())); }
+    function closeComments() { document.getElementById('commentModal').style.display = 'none'; currentVideoForComment = null; }
+
+    function renderComments(commentsObj) {
+        const listContainer = document.getElementById('comment-list-container'); listContainer.innerHTML = '';
+        if(!commentsObj) {
+            document.getElementById('modal-comment-count').innerText = "0";
+            listContainer.innerHTML = '<p style="text-align:center; color:#777; margin-top:20px;">প্রথম কমেন্টটি আপনি করুন!</p>'; return;
+        }
+        const keys = Object.keys(commentsObj).reverse();
+        document.getElementById('modal-comment-count').innerText = keys.length;
+        keys.forEach(k => {
+            let c = commentsObj[k];
+            let adminReplyHtml = c.adminReply ? `<div class="admin-reply"><strong>Admin 🛡️ :</strong> ${c.adminReply}</div>` : '';
+            listContainer.innerHTML += `<div class="comment-item"><strong><i class="fa-solid fa-user-circle"></i> ${c.userName}</strong><p>${c.text}</p>${adminReplyHtml}</div>`;
+        });
+    }
+
+    function postComment() {
+        if(!currentVideoForComment) return;
+        const input = document.getElementById('new-comment-text'); const text = input.value.trim(); if(text === "") return;
+        db.ref('videos/' + currentVideoForComment + '/comments').push({ userName: tgUserName, text: text, timestamp: Date.now() }).then(() => { input.value = ''; });
+    }
+
+    function searchVideo() {
+        let input = document.getElementById('searchInput').value.toLowerCase();
+        for (let card of document.getElementsByClassName('card')) { card.style.display = card.getAttribute('data-title').includes(input) ? "flex" : "none"; }
+    }
+    function filterCategory(category, btnElement) {
+        document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active')); btnElement.classList.add('active');
+        for (let card of document.getElementsByClassName('card')) { card.style.display = (category === 'All' || card.getAttribute('data-category') === category) ? "flex" : "none"; }
+    }
+    function copyLink(id) {
+        let shareUrl = (tgAppUrl && tgAppUrl.trim() !== "") ? tgAppUrl.split('?')[0] + "?startapp=" + id : window.location.origin + window.location.pathname + "?v=" + id;
+        const tempInput = document.createElement("input"); document.body.appendChild(tempInput); tempInput.value = shareUrl; tempInput.select(); document.execCommand("copy"); document.body.removeChild(tempInput);
+        alert("লিংক কপি হয়েছে! বন্ধুদের সাথে শেয়ার করুন।");
+    }
+</script>
+</body>
+</html>
